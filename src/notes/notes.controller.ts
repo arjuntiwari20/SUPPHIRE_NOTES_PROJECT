@@ -1,25 +1,82 @@
-import {Controller, Get, Post, Body}  from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Patch,
+  Delete,
+  UseGuards,
+  ParseIntPipe,
+} from '@nestjs/common';
 import { NotesService } from './notes.service';
+import { CreateNoteDto } from './dto/create.note.dto';
+import { UpdateNoteDto } from './dto/update.note.dto';
+import { JwtGuard } from 'src/common/guards/jwt.guard';
+import { GetUser } from 'src/common/decorators/get-user.decorator';
+import { Note } from '@prisma/client';
+import { RolesGuard } from 'src/common/guards/role.guard';
+import { role } from 'src/common/decorators/role-user.decorator';
+import { Query } from '@nestjs/common';
 
+
+@UseGuards(JwtGuard)
 @Controller('notes')
-
-
 export class NotesController {
-    constructor(private readonly notesService: NotesService) {}
+  constructor(private readonly notesService: NotesService) {}
 
-    @Post('createnotes') 
-    createNote(@Body() note: {title: string; description: string }) {
-        return this.notesService.Create(note);
-    }
+  // ✅ Create Note
+  @Post('create')
+  createNote(
+    @Body() dto: CreateNoteDto,
+    @GetUser('id') userId: number,
+    @GetUser('name') userName: string,
+  ): Promise<Note> {
+    return this.notesService.createNote(dto, userId, userName);
+  }
 
+  // ✅ Update Note
+  @Patch('update/:id')
+  updateNote(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateNoteDto,
+    @GetUser('id') userId: number,
+    @GetUser('name') userName: string,
+  ): Promise<Note> {
+    return this.notesService.updateNote(id, dto, userId, userName);
+  }
 
+  // ✅ Get All
+  @Get('allnotes')
+  getAllNotes(): Promise<any[]> {
+    return this.notesService.getAllNotes();
+  }
 
-    @Get('allnotes')
+  @Get('GetNotesByuser')
+  GetNotesByuser(@GetUser('id') userId: number): Promise<Note[]> {
+    return this.notesService.GetnotesByuser(userId);
+  }
 
-    GetAllNotes() 
-    {
-        return this.notesService.findAll();
+  // ✅ Delete
+  @Delete('delete/:id')
+  @role('admin')
+  deleteNote(
+    @Param('id', ParseIntPipe) id: number,
+    userName: string,
+  ): Promise<Note> {
+    return this.notesService.softDeleteNote(id, userName);
+  }
 
-    }
-
+  @Get('paginated')
+  getNotesPaginated(
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 5,
+  ): Promise<{
+    data: Note[];
+    currentPage: number;
+    totalPages: number;
+    totalRecords: number;
+  }> {
+    return this.notesService.getNotesPaginated(+page, +limit);
+  }
 }
