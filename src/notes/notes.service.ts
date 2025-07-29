@@ -1,44 +1,63 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNoteDto } from './dto/create.note.dto';
 
 import { UpdateNoteDto } from './dto/update.note.dto';
 
 import { Note } from '@prisma/client';
+import { CACHE_MANAGER,  } from '@nestjs/cache-manager';
+import {Cache } from 'cache-manager';
 
 @Injectable()
 export class NotesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService, @Inject(CACHE_MANAGER)private cacheManager: Cache) {}
 
   // Create
   // notes.service.ts
-  async createNote(
-    dto: CreateNoteDto,
-    userId: number,
-    userName: string,
-  ): Promise<any> {
-    return this.prisma.note.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        createdById: userId,
-        createdByName: userName,
-        createdAt: new Date(),
-      },
+ async createNote(
+  dto: CreateNoteDto,
+  userId: number,
+  userName: string,
+): Promise<any> {
+  const note = await this.prisma.note.create({
+    data: {
+      title: dto.title,
+      description: dto.description,
+      createdById: userId,
+      createdByName: userName,
+      createdAt: new Date(),
+    },
+    select: {
+      Id: true,
+      title: true,
+      description: true,
+      createdAt: true,
+      createdById: true,
+      createdByName: true,
+    },
+  });
 
-      select: {
-        Id: true,
-        title: true,
-        description: true,
-        createdAt: true,
-        createdById: true,
-        createdByName: true,
-        // ❌ exclude updatedAt, updatedBy, deletedAt, deletedBy
+  // ✅ After creating, fetch all notes of the user
+  const allNotes = await this.prisma.note.findMany({
+    where: { createdById: userId },
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
       },
-    });
-    // or we can also use fillterd for specific data
-    // if we want to show  the specific value
-  }
+    },
+  });
+
+  // ✅ Cache the updated list with proper key
+  const cacheKey = `user:${userId}:note`;
+  await this.cacheManager.set(cacheKey, allNotes,); 
+  console.log(`✅ Cached all notes for userId ${userId} with key ${cacheKey}`);
+
+  return note;
+}
+
   // Get All
   getAllNotes(): Promise<Note[]> {
     return this.prisma.note.findMany({
@@ -51,23 +70,38 @@ export class NotesService {
       },
     });
   }
+async GetnotesByuser(userId: number): Promise<Note[]> {
+  const cacheKey = `user:${userId}:note`;
 
-  async GetnotesByuser(userId: number): Promise<Note[]> {
-    return this.prisma.note.findMany({
-      where: {
-        createdById: userId,
-      },
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-          },
-        },
-      },
-    });
+  // Step 1: Try to get from Redis cache
+  const cached = await this.cacheManager.get<Note[]>(cacheKey);
+  if (cached) {
+    console.log('✅ Cache Hit');
+    return cached;
   }
 
+  // Step 2: Cache Miss → Fetch from DB
+  console.log('❌ Cache Miss');
+  const note = await this.prisma.note.findMany({
+    where: {
+      createdById: userId,
+    },
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  // Step 3: Store in Redis
+  await this.cacheManager.set(cacheKey, note, 300);
+  console.log(`✅ Stored in Redis with key: ${cacheKey}`);
+
+  return note;
+}
 
   // Update
   async updateNote(
