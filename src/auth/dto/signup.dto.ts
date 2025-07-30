@@ -9,6 +9,6 @@ export class SignupDto {
 
   name: string; 
 
-  @IsIn(['admin', 'employee'])
-  role: 'admin' | 'employee';
+  @IsIn(['admin', 'employee','approver'])
+  role: 'admin' | 'employee' |'approver';
 }

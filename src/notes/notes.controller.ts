@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   ParseIntPipe,
+  ForbiddenException,
 } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create.note.dto';
@@ -18,7 +19,6 @@ import { Note } from '@prisma/client';
 import { RolesGuard } from 'src/common/guards/role.guard';
 import { role } from 'src/common/decorators/role-user.decorator';
 import { Query } from '@nestjs/common';
-
 
 @UseGuards(JwtGuard)
 @Controller('notes')
@@ -78,5 +78,34 @@ export class NotesController {
     totalRecords: number;
   }> {
     return this.notesService.getNotesPaginated(+page, +limit);
+  }
+
+  //approval api
+  @Patch()
+  async approveNote(
+    @Param('NoteId', ParseIntPipe) NoteId: number,
+    @GetUser('id') approvedById: number,
+  ) {
+    return this.notesService.approveNote(NoteId, approvedById);
+  }
+
+  @Patch('approve/:id')
+  async approver(
+    @Param('id', ParseIntPipe) noteId: number,
+    @GetUser('id') approvedById: number,
+    @GetUser('role') role: string, // 👈 get user role from JWT
+  ) {
+    if (role !== 'approver') {
+      throw new ForbiddenException('Only approvers can approve notes');
+    }
+
+    return this.notesService.approveNote(noteId, approvedById);
+  }
+
+  // get my Approved notes
+
+  @Get('getmyapproved')
+  async getMyNotes(@GetUser('id') userId: number) {
+    return this.notesService.getMyApprovedNotes(userId);
   }
 }

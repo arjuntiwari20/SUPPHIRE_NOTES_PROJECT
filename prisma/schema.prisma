@@ -23,6 +23,7 @@ model User {
   role     String
   notes    Note[]
   Bookmark Bookmark[]
+  approvedNotes Note[] @relation("ApprovedNotes")
 }
 
 model Note {
@@ -54,6 +55,15 @@ model Note {
 
   // Relationship
   user            User?     @relation(fields: [createdById], references: [id])
+
+
+  
+  // 🟩 Approval Logic START
+  status          String    @default("pending")     // "pending" | "approved"
+  approvedById    Int?
+  approvedAt DateTime? @default(now())
+  approvedBy      User?     @relation("ApprovedNotes", fields: [approvedById], references: [id])
+  // 🟩 Approval Logic END
 }
 
 model Bookmark {
