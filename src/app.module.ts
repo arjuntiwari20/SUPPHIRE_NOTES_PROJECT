@@ -9,6 +9,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-ioredis-yet';
+import { BookmarkModule } from './Bookmark/Bookmark.module';
+
 
 
 
@@ -20,7 +22,7 @@ import { redisStore } from 'cache-manager-ioredis-yet';
   
 
  
-  imports: [ NotesModule, PrismaModule, ConfigModule.forRoot({ isGlobal: true }), AuthModule, CacheModule.registerAsync({
+  imports: [ NotesModule,  PrismaModule, ConfigModule.forRoot({ isGlobal: true }), AuthModule,  CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => ({
         store: await redisStore({
@@ -29,7 +31,7 @@ import { redisStore } from 'cache-manager-ioredis-yet';
           ttl: 0,             // default TTL in seconds (0 = no expiry)
         }),
       }),
-    })],
+    }),BookmarkModule],
   providers:[PrismaService]
 
 })

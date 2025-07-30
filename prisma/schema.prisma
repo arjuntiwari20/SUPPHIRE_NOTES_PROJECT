@@ -22,6 +22,7 @@ model User {
   password String
   role     String
   notes    Note[]
+  Bookmark Bookmark[]
 }
 
 model Note {
@@ -48,7 +49,23 @@ model Note {
   deletedAt       DateTime?
   deletedBy       String?
 
+  Bookmark    Bookmark[]
+  Bookmarkcount Int  @default(0)
+
   // Relationship
   user            User?     @relation(fields: [createdById], references: [id])
 }
 
+model Bookmark {
+  id        String   @id @default(uuid())
+
+  UserId    Int                         // ✅ changed to Int
+  User      User     @relation(fields: [UserId], references: [id])
+
+  NoteId    Int                         // ✅ changed to Int
+  Note      Note     @relation(fields: [NoteId], references: [Id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([UserId, NoteId])           // ✅ prevent duplicate bookmarks
+}
