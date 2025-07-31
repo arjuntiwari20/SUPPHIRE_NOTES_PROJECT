@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNoteDto } from './dto/create.note.dto';
 
@@ -189,39 +194,111 @@ export class NotesService {
     };
   }
 
-  // approvenote call
-  async approveNote(NoteId: number, approvedById: number) {
+  async getNoteById(noteId: number) {
+    const note = await this.prisma.note.findUnique({
+      where: { Id: noteId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+        approvedBy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!note) {
+      throw new NotFoundException('Note not found');
+    }
+
+    return note;
+  }
+
+  async setApprovalLimit(NoteId: number, requiredApprovals: number) {
     return this.prisma.note.update({
       where: { Id: NoteId },
-      data: {
-        status: 'approved',
-        approvedById: approvedById,
-      },
+      data: { requiredApprovals },
     });
   }
 
+  // approvenote call
+  async approveNote(NoteId: number, approvedById: number) {
+  const existing = await this.prisma.noteApproval.findFirst({
+    where: { NoteId, approvedById },
+  });
 
+  if (existing) {
+    throw new ForbiddenException('You have already approved this note.');
+  }
 
+  // ✅ Record the new approval
+  await this.prisma.noteApproval.create({
+    data: { NoteId, approvedById },
+  });
+
+  // ✅ Count total approvals
+  const approvalCount = await this.prisma.noteApproval.count({
+    where: { NoteId },
+  });
+
+  const note = await this.prisma.note.findUnique({
+    where: { Id: NoteId },
+  });
+
+  if (!note) {
+    throw new NotFoundException('Note not found');
+  }
+
+  const response: any = {
+    message: 'Your approval has been recorded.',
+    currentApprovalCount: approvalCount,
+    requiredApprovals: note.requiredApprovals,
+    status: note.status,
+  };
+
+  // ✅ If final approval reached
+  if (note.requiredApprovals && approvalCount >= note.requiredApprovals) {
+    const updatedNote = await this.prisma.note.update({
+      where: { Id: NoteId },
+      data: {
+        approvalCount,
+        status: 'approved',
+        approvedAt: new Date(),
+      },
+    });
+
+    response.status = 'approved';
+    response.approvedAt = updatedNote.approvedAt;
+    response.message = 'Note is now fully approved!';
+  }
+
+  return response;
+}
 
   async getMyApprovedNotes(userId: number) {
-    
-  return this.prisma.note.findMany({
-    where: {
-      createdById: userId,
-      status:'approved',
-    },
-    select: {
-      Id: true,
-      title: true,
-      status: true,
-      approvedAt: true,
-      approvedBy: {
-        select: {
-          id: true,
-          name: true,
+    return this.prisma.note.findMany({
+      where: {
+        createdById: userId,
+        status: 'approved',
+      },
+      select: {
+        Id: true,
+        title: true,
+        status: true,
+        approvedAt: true,
+        approvedBy: {
+          select: {
+            id: true,
+            name: true,
+          },
         },
       },
-    },
-  });
-}
+    });
+  }
 }

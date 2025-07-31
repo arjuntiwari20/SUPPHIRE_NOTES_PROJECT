@@ -9,6 +9,7 @@ import {
   UseGuards,
   ParseIntPipe,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create.note.dto';
@@ -57,6 +58,15 @@ export class NotesController {
     return this.notesService.GetnotesByuser(userId);
   }
 
+  @Get(':id')
+  async getNoteById(@Param('id', ParseIntPipe) id: number) {
+    const note = await this.notesService.getNoteById(id);
+    if (!note) {
+      throw new NotFoundException('Note not found');
+    }
+    return note;
+  }
+
   // ✅ Delete
   @Delete('delete/:id')
   @role('admin')
@@ -103,6 +113,25 @@ export class NotesController {
   }
 
   // get my Approved notes
+
+  @Patch('set-approvals/:id')
+  async setApprovalLimit(
+    @Param('id', ParseIntPipe) NoteId: number,
+    @Body('requiredApprovals') requiredApprovals: number,
+    @GetUser() User: any,
+  ) {
+    const note = await this.notesService.getNoteById(NoteId);
+
+    if (User.role !== 'admin') {
+      throw new ForbiddenException('only admin can set approval limit ');
+    }
+
+    if (note.createdById === User.id) {
+      throw new ForbiddenException('Admin cannot set approval for own post ');
+    }
+
+    return this.notesService.setApprovalLimit(NoteId, requiredApprovals);
+  }
 
   @Get('getmyapproved')
   async getMyNotes(@GetUser('id') userId: number) {

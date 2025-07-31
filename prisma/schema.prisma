@@ -23,6 +23,7 @@ model User {
   role     String
   notes    Note[]
   Bookmark Bookmark[]
+  NoteApproval   NoteApproval[]
   approvedNotes Note[] @relation("ApprovedNotes")
 }
 
@@ -62,6 +63,9 @@ model Note {
   status          String    @default("pending")     // "pending" | "approved"
   approvedById    Int?
   approvedAt DateTime? @default(now())
+  NoteApproval   NoteApproval[]
+  requiredApprovals Int?
+  approvalCount     Int       @default(0)
   approvedBy      User?     @relation("ApprovedNotes", fields: [approvedById], references: [id])
   // 🟩 Approval Logic END
 }
@@ -78,4 +82,20 @@ model Bookmark {
   createdAt DateTime @default(now())
 
   @@unique([UserId, NoteId])           // ✅ prevent duplicate bookmarks
+
+
+
 }
+
+  model NoteApproval {
+  id        Int    @id @default(autoincrement())
+  NoteId    Int
+  Note      Note   @relation(fields: [NoteId], references: [Id])
+  approvedById Int
+  
+  approvedBy  User   @relation(fields: [approvedById], references: [id])
+  
+  @@unique([NoteId, approvedById]) // prevent duplicate approvals
+}
+
+
