@@ -10,6 +10,8 @@ import { ConfigModule } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-ioredis-yet';
 import { BookmarkModule } from './Bookmark/Bookmark.module';
+import {SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+
 
 
 

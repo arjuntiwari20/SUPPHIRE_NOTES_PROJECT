@@ -204,9 +204,11 @@ export class NotesService {
 
 
   async getMyApprovedNotes(userId: number) {
+    
   return this.prisma.note.findMany({
     where: {
       createdById: userId,
+      status:'approved',
     },
     select: {
       Id: true,
